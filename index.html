@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Interaktivní seminář o počítačových sítích: co se děje při načítání webu, IPv4, DNS, ARP a základní diagnostika.">
+<title>Co se stane po Enteru</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one slide per screen, a top bar with the lesson clock and a bottom "patch panel" of slide segments in T568B cable colors */
+:root{
+  --bg:#f2f5f8; --surface:#ffffff; --fg:#16202b; --muted:#5a6878; --line:#d5dde6;
+  --orange:#c8650f; --green:#24804a; --blue:#2559b8; --brown:#7a5234;
+  --ok:#24804a; --bad:#b8352a; --warn:#b97a0a;
+  --orange-soft:#fbeadb; --green-soft:#dff1e6; --blue-soft:#e1e9f8; --brown-soft:#efe5dc;
+  --f-display:"Chivo","Arial Narrow",Arial,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f151c; --surface:#18212b; --fg:#e5ebf1; --muted:#97a6b6; --line:#2c3845;
+  --orange:#f0913f; --green:#4cc07a; --blue:#6f9cf0; --brown:#c39470;
+  --ok:#4cc07a; --bad:#f07468; --warn:#e8b04a;
+  --orange-soft:#3a2614; --green-soft:#14301f; --blue-soft:#172742; --brown-soft:#2f2219;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f151c; --surface:#18212b; --fg:#e5ebf1; --muted:#97a6b6; --line:#2c3845;
+  --orange:#f0913f; --green:#4cc07a; --blue:#6f9cf0; --brown:#c39470;
+  --ok:#4cc07a; --bad:#f07468; --warn:#e8b04a;
+  --orange-soft:#3a2614; --green-soft:#14301f; --blue-soft:#172742; --brown-soft:#2f2219;
+  color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:clamp(1rem,1.45vw,1.3rem);line-height:1.5}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+code,.mono{font-family:var(--f-mono);font-size:.88em}
+
+.deck{height:100%;display:grid;grid-template-rows:auto 1fr auto}
+.topbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem;padding:.6rem 16px;border-bottom:1px solid var(--line);font-size:.8rem;color:var(--muted)}
+.topbar .course{font-weight:600;letter-spacing:.02em;margin-right:auto;min-width:0}
+.chip{display:inline-flex;align-items:center;gap:.4rem;padding:.2rem .65rem;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-family:var(--f-mono);font-size:.78rem;white-space:nowrap;font-variant-numeric:tabular-nums}
+.chip.late{border-color:var(--bad);color:var(--bad)}
+.iconbtn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:.2rem .6rem;font-size:.78rem}
+
+main{position:relative;overflow:hidden}
+.slide{position:absolute;inset:0;overflow-y:auto;padding:clamp(1rem,3vw,2.6rem) 16px;display:none}
+.slide.active{display:block}
+.inner{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:clamp(.8rem,1.8vw,1.4rem)}
+.eyebrow{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;gap:.8rem;flex-wrap:wrap;align-items:center}
+.eyebrow .seg{color:var(--wire,var(--blue));font-weight:600}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.08}
+h1{font-size:clamp(2.1rem,6vw,4.8rem);font-weight:900;letter-spacing:-.02em}
+h2{font-size:clamp(1.6rem,3.6vw,2.8rem);font-weight:900;letter-spacing:-.01em}
+h3{font-size:clamp(1.05rem,1.7vw,1.35rem);font-weight:700}
+p{margin:0;max-width:65ch}
+a{color:var(--blue);text-underline-offset:.15em}
+.lead{font-size:1.15em;color:var(--muted)}
+.model{font-size:.82em;color:var(--muted);max-width:none}
+ul.clean{margin:0;padding-left:1.1em;display:grid;gap:.35rem}
+
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr));gap:1rem}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));gap:1rem}
+.grid2>*,.grid3>*{min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:1rem 1.2rem;display:flex;flex-direction:column;gap:.6rem}
+
+/* wire stripe = cable color of the slide */
+.wire{height:6px;width:min(14rem,60%);border-radius:3px;background:repeating-linear-gradient(90deg,var(--wire) 0 18px,var(--surface) 18px 26px);border:1px solid var(--wire)}
+
+/* timer */
+.timer{display:inline-flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.timer .t{font-family:var(--f-mono);font-size:clamp(1.6rem,3.4vw,2.6rem);font-weight:600;font-variant-numeric:tabular-nums;min-width:5.2ch}
+.timer.done .t{color:var(--bad);animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.35}}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:.35rem .9rem;font-weight:600}
+.btn.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+
+/* title slide */
+.title-slide .inner{min-height:100%;justify-content:center}
+.prompt{font-family:var(--f-mono);font-size:clamp(1.1rem,2.6vw,2rem);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.7rem 1rem;display:flex;align-items:center;gap:.6rem;max-width:42rem}
+.prompt .cur{width:.6ch;height:1.1em;background:var(--orange);animation:blink 1.1s steps(2) infinite}
+.key{display:inline-block;font-family:var(--f-mono);font-size:.8em;padding:.05rem .5rem;border:1px solid var(--line);border-bottom-width:3px;border-radius:5px;background:var(--surface)}
+.meta{display:flex;flex-wrap:wrap;gap:.4rem 1.6rem;color:var(--muted);font-size:.95em}
+
+/* tables */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.88em}
+th,td{text-align:left;padding:.45rem .8rem;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.today td{background:var(--orange-soft)}
+tr.off td{color:var(--muted);text-decoration:line-through}
+.tag{display:inline-block;font-size:.75em;font-weight:700;padding:.05rem .45rem;border-radius:4px;background:var(--blue-soft);color:var(--blue);white-space:nowrap}
+
+/* tally */
+.tally{display:grid;gap:.55rem}
+.trow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.4rem 1rem;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.6rem .9rem}
+.trow .bar{grid-column:1/-1;height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.trow .bar i{display:block;height:100%;background:var(--wire);width:0;transition:width .25s}
+.ctr{display:flex;align-items:center;gap:.4rem}
+.ctr button{width:2.1rem;height:2.1rem;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-weight:700}
+.ctr output{font-family:var(--f-mono);min-width:2.5ch;text-align:center;font-variant-numeric:tabular-nums;font-weight:600}
+.inline-num{width:4.5rem;font:inherit;padding:.2rem .4rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg)}
+
+/* command tabs */
+.tabs{display:flex;gap:.4rem;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:.25rem .9rem;font-weight:600}
+.tab[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.cmd{display:flex;align-items:center;gap:.5rem;justify-content:space-between}
+.cmd code{background:var(--bg);padding:.12rem .45rem;border-radius:5px;border:1px solid var(--line);white-space:nowrap}
+.copy{border:0;background:none;color:var(--muted);font-size:.75em;padding:.1rem .3rem}
+
+/* network map */
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr));gap:.6rem}
+.form label{display:flex;flex-direction:column;gap:.2rem;font-size:.8em;color:var(--muted);font-weight:600}
+.form input{font-family:var(--f-mono);font-size:.95rem;padding:.4rem .55rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg);min-width:0}
+.svgwrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.4rem}
+.svgwrap svg{display:block;width:100%;min-width:640px;height:auto}
+.facts{display:flex;flex-wrap:wrap;gap:.5rem}
+.fact{font-family:var(--f-mono);font-size:.8em;padding:.25rem .6rem;border-radius:6px;background:var(--bg);border:1px solid var(--line)}
+.fact.good{border-color:var(--ok);color:var(--ok)} .fact.bad{border-color:var(--bad);color:var(--bad)}
+.fact.warn{border-color:var(--warn);color:var(--warn)}
+.example{font-size:.78em;color:var(--warn);font-weight:600}
+
+/* reveal cards */
+details.q{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.8rem 1rem}
+details.q summary{cursor:pointer;font-weight:700;font-family:var(--f-display);font-size:1.05em;list-style:none;display:flex;gap:.6rem}
+details.q summary::-webkit-details-marker{display:none}
+details.q summary::before{content:"+";font-family:var(--f-mono);color:var(--wire)}
+details.q[open] summary::before{content:"–"}
+details.q p{margin-top:.5rem;color:var(--muted)}
+
+/* diagnosis switches */
+.checks{display:grid;gap:.5rem}
+.sw{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.55rem .9rem}
+.sw code{font-size:.85em}
+.seg2{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex-shrink:0}
+.seg2 button{border:0;background:var(--surface);padding:.3rem .8rem;font-weight:700}
+.seg2 button[aria-pressed="true"].y{background:var(--ok);color:var(--surface)}
+.seg2 button[aria-pressed="true"].n{background:var(--bad);color:var(--surface)}
+.verdict{border-left:6px solid var(--wire);background:var(--surface);border-radius:0 10px 10px 0;padding:.9rem 1.1rem;display:flex;flex-direction:column;gap:.35rem}
+.verdict .where{font-family:var(--f-mono);font-size:.75em;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+
+/* ordering */
+.order{list-style:none;margin:0;padding:0;display:grid;gap:.45rem}
+.order li{display:grid;grid-template-columns:2.2rem minmax(0,1fr) auto;align-items:center;gap:.7rem;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.45rem .7rem}
+.order .n{font-family:var(--f-mono);font-weight:600;color:var(--muted);text-align:center}
+.order li.right{border-color:var(--ok);background:var(--green-soft)}
+.order li.wrong{border-color:var(--bad)}
+.order .mv{display:flex;gap:.3rem}
+.order .mv button{width:2rem;height:2rem;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.order small{display:block;color:var(--muted);font-size:.8em}
+.feedback{min-height:1.5em;font-weight:600}
+
+/* syllabus path */
+.path{display:grid;gap:.5rem}
+.step{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.2rem 1rem;align-items:baseline;padding:.55rem .9rem;border-radius:10px;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--c)}
+.step b{font-family:var(--f-display)}
+.step span.when{font-family:var(--f-mono);font-size:.8em;color:var(--c);font-weight:600;white-space:nowrap}
+.step small{grid-column:1/-1;color:var(--muted);font-size:.85em}
+
+.notes{display:none;border:1px dashed var(--warn);border-radius:10px;padding:.7rem 1rem;font-size:.85em;color:var(--muted);background:var(--surface)}
+body.show-notes .notes{display:block}
+.notes b{color:var(--warn)}
+.notes p+p{margin-top:.4rem}
+
+/* bottom panel */
+.bottombar{display:flex;align-items:center;gap:.6rem;padding:.55rem 16px calc(.55rem + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}
+.ports{display:flex;gap:4px;flex:1;min-width:0}
+.port{flex:1;height:14px;border-radius:3px;border:1px solid var(--line);background:var(--surface);padding:0;position:relative}
+.port.lit{background:var(--pc);border-color:var(--pc)}
+.port.cur{outline:2px solid var(--fg);outline-offset:1px}
+.navbtn{border:1px solid var(--line);background:var(--surface);border-radius:8px;width:2.4rem;height:2.2rem;font-weight:700;flex-shrink:0}
+.counter{font-family:var(--f-mono);font-size:.78rem;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.hint{font-size:.75rem;color:var(--muted)}
+@media (max-width:640px){.hint{display:none}.topbar .course{flex-basis:100%}}
+@media (min-width:900px){
+  .slide.compact{padding:.8rem 16px;font-size:1.15rem}
+  .compact .inner{gap:.6rem}
+  .compact .svgwrap svg{max-width:880px;margin:auto}
+}
+@media (min-width:900px) and (max-height:800px){
+  .slide.compact{padding:.6rem 16px;font-size:1.05rem}
+  .compact .inner{gap:.4rem}
+  .compact h2{font-size:2.4rem}
+  .compact th,.compact td{padding:.3rem .8rem}
+  .compact .order li{padding:.3rem .7rem}
+  .compact .step{padding:.3rem .9rem}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="deck">
+  <header class="topbar">
+    <span class="course">Správa technických a informačních systémů · seminář 1</span>
+    <span class="chip" id="planChip" title="Plánovaný čas tohoto slajdu">plán —</span>
+    <span class="chip" id="clockChip">hodina 00:00 / 65:00</span>
+    <button class="iconbtn" id="clockBtn" type="button">Spustit hodinu</button>
+    <button class="iconbtn" id="notesBtn" type="button" title="Poznámky pro vyučujícího (klávesa N)">Poznámky</button>
+    <button class="iconbtn" id="fsBtn" type="button" title="Celá obrazovka (klávesa F)">Celá obrazovka</button>
+  </header>
+
+  <main id="slides">
+
+  <!-- 1 -->
+  <section class="slide title-slide active" data-wire="orange" data-plan="">
+    <div class="inner">
+      <div class="eyebrow"><span class="seg">Setkání 1 / 8</span><span>6. 10. 2026 · 8:00–9:05 · R013B</span></div>
+      <div class="prompt" aria-label="Adresní řádek"><span>pedf.cuni.cz</span><span class="cur" aria-hidden="true"></span></div>
+      <h1>Co se stane, když zmáčknu <span class="key">Enter</span>?</h1>
+      <p class="lead">Dnes zjistíte, v jaké síti sedíte, a uvidíte, že jedno stisknutí klávesy projde skoro celým semestrem.</p>
+      <div class="meta"><span>Správa technických a informačních systémů</span><span>PhDr. Martin Beneš, Ph.D.</span></div>
+      <aside class="notes"><b>Ovládání:</b> šipky / mezerník přepínají slajdy, N poznámky, F celá obrazovka. Tlačítkem „Spustit hodinu“ nahoře zapneš hodiny; chip „plán“ zčervená, když jsi za plánem.</aside>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="slide" data-wire="orange" data-plan="0–5">
+    <div class="inner">
+      <div class="eyebrow"><span class="seg">0–5 min</span><span>každý sám, na papír</span></div>
+      <div class="wire"></div>
+      <h2>Napíšete do prohlížeče <code>pedf.cuni.cz</code> a zmáčknete Enter.</h2>
+      <p class="lead">Popište co nejpodrobněji, co se stane, než se stránka zobrazí. Žádné googlení. Kdo neví, ať odhaduje.</p>
+      <div class="timer" data-seconds="240"><span class="t">4:00</span><button class="btn primary" type="button" data-act="toggle">Start</button><button class="btn" type="button" data-act="reset">Znovu</button></div>
+      <aside class="notes"><p><b>Pozor:</b> papíry vyber nebo ať si je nechají, na konci hodiny se k nim vracíme. Neopravuj, jen sbírej.</p><p><b>Klíč:</b> počítač už je připojený a má konfiguraci, obvykle z DHCP. Prohlížeč může použít cache. Při novém načítání zjistí adresu přes DNS, podle potřeby použije ARP, naváže TCP a TLS, vyžádá HTML a další zdroje. Routery předávají už DNS dotaz i všechny další IP pakety. ARP před DNS vysvětluj na našem příkladu s DNS mimo podsíť.</p></aside>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="slide" data-wire="green" data-plan="5–13">
+    <div class="inner">
+      <div class="eyebrow"><span class="seg">5–13 min</span><span>organizace</span></div>
+      <div class="wire"></div>
+      <h2>Jak získáte zápočet</h2>
+      <div class="grid2">
+        <div class="panel">
+          <h3>Podmínky</h3>
+          <ul class="clean">
+            <li>Aktivní práce během seminářů</li>
+            <li>Samostatný projekt na předem zvolené téma, s funkčním výstupem</li>
+            <li>Včasné odevzdání</li>
+            <li>Obhajoba: 5 min demo, 3 min otázky</li>
+            <li>Ke každému projektu krátká didaktická část: jak bych to použil(a) ve škole</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Milníky projektu</h3>
+          <div class="tablewrap" style="border:0">
+          <table>
+            <tr><td class="num">setkání 3</td><td>Volba tématu</td></tr>
+            <tr><td class="num">setkání 5</td><td>Návrh projektu na 1 stranu</td></tr>
+            <tr><td class="num">setkání 7</td><td>Odevzdání</td></tr>
+            <tr><td class="num">setkání 8</td><td>Obhajoby</td></tr>
+          </table>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Příklady témat</h3>
+        <p>Pi-hole jako DNS filtr pro učebnu · monitoring školních služeb (Uptime Kuma) · návrh sítě školy s VLAN v Packet Traceru · automatizovaná správa učebny (Ansible) · zálohování učitelského NAS · Wireshark analýza protokolu a k ní pracovní list</p>
+      </div>
+      <aside class="notes"><b>Řekni:</b> máme 8 setkání ve dvou blocích po čtyřech. Konzultace po domluvě e-mailem.</aside>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="slide" data-wire="green" data-plan="5–13">
+    <div class="inner">
+      <div class="eyebrow"><span class="seg">5–13 min</span><span>harmonogram</span></div>
+      <div class="wire"></div>
+      <h2>Osm setkání ve dvou blocích</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>#</th><th>Téma</th><th>Projekt</th></tr></thead>
+          <tbody>
+            <tr><td colspan="3"><span class="tag">blok 1 · jak síť funguje</span></td></tr>
+            <tr class="today"><td class="num">1</td><td>Úvod: co se stane po stisku Enter</td><td><span class="tag">dnes</span></td></tr>
+            <tr><td class="num">2</td><td>Architektura sítí, switch, router, AP, Ethernet, MAC, model OSI a TCP/IP</td><td></td></tr>
+            <tr><td class="num">3</td><td>Adresace IPv4, maska, NAT, IPv6, ARP, ICMP</td><td><span class="tag">volba tématu</span></td></tr>
+            <tr><td class="num">4</td><td>DHCP a DNS, analýza provozu ve Wiresharku</td><td></td></tr>
+            <tr><td colspan="3"><span class="tag">blok 2 · jak síť spravovat</span></td></tr>
+            <tr><td class="num">5</td><td>TCP, UDP, HTTP/HTTPS, TLS; služby SSH, SMTP/IMAP, NFS, NTP, SNMP</td><td><span class="tag">návrh</span></td></tr>
+            <tr><td class="num">6</td><td>Školní síť: VLAN, Wi‑Fi, eduroam, školní IS, MDM</td><td></td></tr>
+            <tr><td class="num">7</td><td>Bezpečnost, zálohování, monitoring webů, podpora uživatelů</td><td><span class="tag">odevzdání</span></td></tr>
+            <tr><td class="num">8</td><td>Obhajoby projektů</td><td><span class="tag">obhajoba</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="slide" data-wire="blue" data-plan="13–20">
+    <div class="inner">
+      <div class="eyebrow"><span class="seg">13–20 min</span><span>vstupní mapování · zvedněte ruku</span></div>
+      <div class="wire"></div>
+      <h2>Kdo z vás…</h2>
+      <p>Počet přítomných: <input class="inline-num" id="present" type="number" min="1" max="99" value="12" aria-label="Počet přítomných studentů"></p>
+      <div class="tally" id="tally"></div>
+      <aside class="notes"><b>Tempo:</b> pokud masku umí méně než třetina, zpomal setkání 3 a přidej víc počítání podsítí. Pokud Wireshark nikdo nezná, na setkání 4 začni ukázkou na projektoru.</aside>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="slide compact" data-wire="blue" data-plan="20–40">
+    <div class="inner">
+      <div class="eyebrow"><span class="seg">20–40 min</span><span>ve dvojicích</span></div>
+      <div class="wire"></div>
+      <h2>Detektivka: síť, ve které sedíme</h2>
+      <p>Zjistěte všechno z tabulky a výsledky si zapište. Za 20 minut porovnáme a nakreslíme mapu.</p>
+      <div class="timer" data-seconds="1200"><span class="t">20:00</span><button class="btn primary" type="button" data-act="toggle">Start</button><button class="btn" type="button" data-act="reset">Znovu</button></div>
+      <div class="tabs" role="tablist" aria-label="Operační systém">
+        <button class="tab" role="tab" aria-selected="true" data-os="win" type="button">Windows</button>
+        <button class="tab" role="tab" aria-selected="false" data-os="lin" type="button">Linux</button>
+        <button class="tab" role="tab" aria-selected="false" data-os="mac" type="button">macOS</button>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Co zjišťuju</th><th>Příkaz</th></tr></thead>
+          <tbody id="cmdBody"></tbody>
+        </table>
+      </div>
+      <p class="model" id="cmdHelp" aria-live="polite"></p>
+      <aside class="notes"><p><b>Záloha:</b> když učebna blokuje příkazový řádek, použijte vlastní notebooky nebo spusť příkazy na projektoru a interpretujte je společně. Nástroje <code>dig</code>, <code>traceroute</code> či <code>tracepath</code> nemusí být na Linuxu nainstalované. Příkazy zkoumají hlavně IPv4, prohlížeč může použít i IPv6 nebo vlastní DNS přes HTTPS.</p><p><b>Výstupy:</b> 169.254.x.x je link-local, v učebně často známka nezískané konfigurace DHCP. Vyberte aktivní adaptér, pozor na VPN a virtuální adaptéry. „Neautoritativní odpověď“ znamená, že odpovídající server není autoritou pro danou doménu. Odpověď může mít z cache, nebo ji právě zjistil. Více IP může sloužit k rozkládání zátěže, samotný výpis však CDN nedokazuje.</p><p><b>MAC a trasa:</b> výrobce lze často odhadnout z OUI globálně přidělené MAC. U náhodné či lokálně nastavené MAC to neplatí. První veřejná IP v traceroute není důkaz hranice fakulty. Web UK může být blízko, pro srovnání zkuste trasu na google.com.</p><p><b>Zdroje:</b> <a href="https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/tracert">Microsoft: tracert</a>, <a href="https://developer.apple.com/documentation/network/recording-a-packet-trace">Apple: výběr síťového rozhraní</a>, <a href="https://www.rfc-editor.org/rfc/rfc1035.html#section-4.1.1">RFC 1035: autoritativní odpověď</a>, <a href="https://standards.ieee.org/products-programs/regauth/oui/">IEEE: OUI</a>, <a href="https://support.apple.com/guide/security/sec31e483abf/web">Apple: náhodné MAC adresy</a>.</p></aside>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="slide compact" data-wire="blue" data-plan="40–50">
+    <div class="inner">
+      <div class="eyebrow"><span class="seg">40–50 min</span><span>společné porovnání</span></div>
+      <div class="wire"></div>
+      <h2>Mapa naší sítě</h2>
+      <p>Zadejte hodnoty, které jste zjistili. Mapa spočítá IPv4 podsíť. <span class="example" id="exNote">Předvyplněné hodnoty jsou jen příklad.</span></p>
+      <form class="form" id="netForm" autocomplete="off">
+        <label for="fIp">Moje IP<input id="fIp" value="10.20.30.57"></label>
+        <label for="fMask">Maska nebo prefix<input id="fMask" value="255.255.255.0" placeholder="255.255.255.0 nebo /24"></label>
+        <label for="fGw">Výchozí brána<input id="fGw" value="10.20.30.1"></label>
+        <label for="fDns">DNS server<input id="fDns" value="10.20.0.53"></label>
+        <label for="fMac">Moje MAC<input id="fMac" value="3c:52:82:aa:10:5f"></label>
+        <label for="fEdge">Hopy za bránou (orientačně)<input id="fEdge" value="cuni.cz → cesnet.cz"></label>
+      </form>
+      <div class="svgwrap"><svg id="netSvg" viewBox="0 0 960 300" role="img" aria-label="Schéma sítě učebny"></svg></div>
+      <div class="facts" id="facts"></div>
+      <p class="model">Zjednodušené schéma IPv4. Cílový web může být uvnitř sítě UK, cesta tedy nemusí vést přes CESNET.</p>
+      <aside class="notes"><b>Zdroje:</b> <a href="https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml">IANA: zvláštní IPv4 rozsahy</a>, <a href="https://www.rfc-editor.org/rfc/rfc3021.html">RFC 3021: /31 na spojích bod–bod</a>, <a href="https://www.rfc-editor.org/rfc/rfc3927.html">RFC 3927: link-local adresy</a>.</aside>
+    </div>
+  </section>
+
+  <!-- 8 -->
+  <section class="slide" data-wire="blue" data-plan="40–50">
+    <div class="inner">
+      <div class="eyebrow"><span class="seg">40–50 min</span><span>otázky k mapě · klikněte pro odpověď</span></div>
+      <div class="wire"></div>
+      <h2>Co nám mapa říká</h2>
+      <div class="grid2">
+        <details class="q"><summary>Proč máme všichni stejnou bránu, ale různé IP?</summary><p>V jedné podsíti obvykle používáme společnou bránu pro cestu do dalších sítí. Každé zařízení ale musí mít svou jedinečnou IP adresu. Tu často přiděluje DHCP server, ke kterému se dostaneme na setkání 4.</p></details>
+        <details class="q"><summary>Mám adresu 10.x nebo 192.168.x. Jak se s ní dostanu na internet?</summary><p>To jsou privátní rozsahy (RFC 1918), stejně jako <code>172.16.0.0–172.31.255.255</code>. Ve veřejném internetu se nesměrují. Obvykle je hraniční router překládá na veřejnou adresu pomocí NAT. S veřejnou adresou tento překlad není nutný.</p></details>
+        <details class="q"><summary>Kde v traceroute končí fakultní síť?</summary><p>Názvy jako <code>cuni.cz</code> a <code>cesnet.cz</code> napovídají, ale hranici sítě samy nedokazují. CESNET provozuje českou akademickou páteřní síť. <code>* * *</code> znamená, že odpověď nepřišla v limitu. Router může odpovědi blokovat, a přesto normálně předávat provoz.</p></details>
+        <details class="q"><summary>Proč je v ARP tabulce MAC adresa brány, ale ne adresa pedf.cuni.cz?</summary><p>Je-li web mimo místní podsíť, pošlu rámec na MAC adresu brány. Router ho přepošle v novém rámci dál. MAC adresy se mění při přechodu přes routery, cílová IP adresa obvykle zůstává stejná. ARP se týká IPv4.</p></details>
+      </div>
+      <aside class="notes"><b>Zdroje:</b> <a href="https://www.rfc-editor.org/rfc/rfc1918.html">RFC 1918</a>, <a href="https://www.rfc-editor.org/rfc/rfc826.html">RFC 826: ARP</a>, <a href="https://www.rfc-editor.org/rfc/rfc4861.html">RFC 4861: IPv6 Neighbor Discovery</a>, <a href="https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/tracert">Microsoft: omezení tracert</a>, <a href="https://www.cesnet.cz/">CESNET</a>.</aside>
+    </div>
+  </section>
+
+  <!-- 9 -->
+  <section class="slide" data-wire="brown" data-plan="40–50">
+    <div class="inner">
+      <div class="eyebrow"><span class="seg">40–50 min</span><span>první úloha správce</span></div>
+      <div class="wire"></div>
+      <h2>Kolega volá: „Nejde mi internet.“</h2>
+      <p>Nastavte, co ze tří testů prošlo. Co výsledky naznačují a co ověříte dál?</p>
+      <div class="grid2">
+        <div class="checks" id="checks"></div>
+        <div class="verdict" id="verdict" aria-live="polite"></div>
+      </div>
+      <p class="model">Neúspěšný ping může znamenat také blokování ICMP. Výsledek je vodítko pro další test.</p>
+      <aside class="notes"><p><b>Postup:</b> nejdřív nech třídu tipovat, až potom přepínej. Klíčový případ je ping 1.1.1.1 ✓ a překlad jména ✗. Pak ukaž, že brána nemusí odpovídat na ping, i když přes ni provoz prochází. Výsledky jsou podklady pro další testy, nikoli jistá diagnóza.</p><p><b>Proč 1.1.1.1:</b> je to veřejný DNS resolver Cloudflare, zde jeho adresu používáme jako cíl pro ping. <a href="https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/ping">Microsoft: ping</a>, <a href="https://developers.cloudflare.com/1.1.1.1/">Cloudflare: 1.1.1.1</a>.</p></aside>
+    </div>
+  </section>
+
+  <!-- 10 -->
+  <section class="slide compact" data-wire="orange" data-plan="50–60">
+    <div class="inner">
+      <div class="eyebrow"><span class="seg">50–60 min</span><span>návrat k úvodní otázce</span></div>
+      <div class="wire"></div>
+      <h2>Od připojení k načtení webu</h2>
+      <p>Nejdřív si doplňte svůj papír z úvodu. Pak společně seřaďte kroky šipkami.</p>
+      <p class="model">Zjednodušený příběh pro IPv4 a HTTPS přes TCP. DNS je v našem příkladu mimo podsíť. DHCP proběhne už před Enterem, cache může některé kroky vynechat.</p>
+      <ol class="order" id="order"></ol>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
+        <button class="btn primary" type="button" id="checkOrder">Zkontrolovat</button>
+        <button class="btn" type="button" id="shuffleOrder">Zamíchat</button>
+        <span class="feedback" id="orderFb" aria-live="polite"></span>
+      </div>
+      <aside class="notes"><p><b>Podmínky modelu:</b> DHCP obvykle proběhne při připojení a později obnovuje pronájem. Enter ho běžně nespouští. ARP zjistí MAC dalšího uzlu podle trasy. Zde je DNS mimo podsíť, takže před odesláním DNS dotazu potřebujeme MAC brány. S lokálním DNS, záznamem v cache nebo jinou trasou je průběh jiný. Směrování provází DNS, TCP i další IP pakety, není samostatnou fází mezi DNS a TCP.</p><p><b>Další varianty:</b> prohlížeč může použít cache, existující spojení, proxy, IPv6 nebo DNS přes HTTPS. HTTP/3 používá QUIC přes UDP a TLS, takže samostatný TCP handshake odpadá.</p><p><b>Zdroje:</b> <a href="https://www.rfc-editor.org/rfc/rfc2131.html">DHCP</a>, <a href="https://www.rfc-editor.org/rfc/rfc826.html">ARP</a>, <a href="https://www.rfc-editor.org/rfc/rfc1034.html">DNS a cache</a>, <a href="https://www.rfc-editor.org/rfc/rfc9293.html">TCP</a>, <a href="https://www.rfc-editor.org/rfc/rfc8446.html">TLS 1.3</a>, <a href="https://www.rfc-editor.org/rfc/rfc9114.html">HTTP/3</a>.</p></aside>
+    </div>
+  </section>
+
+  <!-- 11 -->
+  <section class="slide compact" data-wire="orange" data-plan="50–60">
+    <div class="inner">
+      <div class="eyebrow"><span class="seg">50–60 min</span><span>osnova semestru</span></div>
+      <div class="wire"></div>
+      <h2>Jeden Enter, celý semestr</h2>
+      <div class="path">
+        <div class="step" style="--c:var(--green)"><b>Kabel, Wi‑Fi, switch, MAC</b><span class="when">setkání 2</span><small>Připojení do sítě obvykle předchází stisku Enter.</small></div>
+        <div class="step" style="--c:var(--blue)"><b>Vrstvy a zapouzdření</b><span class="when">setkání 2</span><small>Nižší vrstvy přidávají údaje pro přenos dat. Uvidíme to ve Wiresharku.</small></div>
+        <div class="step" style="--c:var(--orange)"><b>DHCP: odkud mám IP</b><span class="when">setkání 4</span><small>Discover, Offer, Request, ACK. Při připojení, ne při každém Enteru.</small></div>
+        <div class="step" style="--c:var(--blue)"><b>ARP: MAC adresa brány</b><span class="when">setkání 3</span><small>Spolu s adresací IPv4, maskou a NAT.</small></div>
+        <div class="step" style="--c:var(--orange)"><b>DNS: jméno na adresu</b><span class="when">setkání 4</span><small>pedf.cuni.cz → IP adresa.</small></div>
+        <div class="step" style="--c:var(--brown)"><b>Směrování přes routery</b><span class="when">setkání 2 a 3</span><small>Každý IP paket putuje podle tras k cíli, například přes bránu a síť UK.</small></div>
+        <div class="step" style="--c:var(--green)"><b>TCP, TLS, HTTP</b><span class="when">setkání 5</span><small>HTTPS může použít TCP a TLS. HTTP/3 používá QUIC přes UDP s TLS.</small></div>
+        <div class="step" style="--c:var(--bad)"><b>Kdo se může vmísit do cesty</b><span class="when">setkání 6 a 7</span><small>Školní síť, VLAN, útoky, hesla.</small></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 -->
+  <section class="slide" data-wire="brown" data-plan="60–65">
+    <div class="inner">
+      <div class="eyebrow"><span class="seg">60–65 min</span><span>výstupní lístek</span></div>
+      <div class="wire"></div>
+      <h2>Než odejdete</h2>
+      <div class="grid2">
+        <div class="panel"><h3>Na lístek</h3><ul class="clean"><li>Jedna věc, kterou jsem dnes pochopil(a)</li><li>Jedna věc, která mi není jasná</li></ul></div>
+        <div class="panel"><h3>Na příště</h3><ul class="clean"><li>Vzpomeňte si na jeden konkrétní problém se sítí nebo technikou ve škole, kterou znáte. Může to být zárodek projektu.</li><li>Čtení: Kurose &amp; Ross, <i>Počítačové sítě</i>, kapitola 1. K dispozici jsou i <a href="https://gaia.cs.umass.edu/kurose_ross/videos/1/">volně přístupné výklady autorů v angličtině</a>.</li></ul></div>
+      </div>
+      <div class="timer" data-seconds="300"><span class="t">5:00</span><button class="btn primary" type="button" data-act="toggle">Start</button><button class="btn" type="button" data-act="reset">Znovu</button></div>
+      <p class="lead">Příště: architektura sítí a první síť v simulátoru.</p>
+    </div>
+  </section>
+
+  </main>
+
+  <footer class="bottombar">
+    <button class="navbtn" id="prev" type="button" aria-label="Předchozí slajd">←</button>
+    <div class="ports" id="ports"></div>
+    <button class="navbtn" id="next" type="button" aria-label="Další slajd">→</button>
+    <span class="counter" id="counter">1 / 12</span>
+    <span class="hint">← → · N · F</span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  const slides=[...document.querySelectorAll('.slide')];
+  const ports=document.getElementById('ports');
+  let cur=0;
+  slides.forEach((s,i)=>{
+    s.style.setProperty('--wire','var(--'+(s.dataset.wire||'blue')+')');
+    const b=document.createElement('button');
+    b.className='port';b.type='button';b.style.setProperty('--pc','var(--'+(s.dataset.wire||'blue')+')');
+    b.setAttribute('aria-label','Slajd '+(i+1));
+    b.addEventListener('click',()=>go(i));
+    ports.appendChild(b);
+  });
+  const portEls=[...ports.children];
+  function go(i){
+    cur=Math.max(0,Math.min(slides.length-1,i));
+    slides.forEach((s,k)=>s.classList.toggle('active',k===cur));
+    portEls.forEach((p,k)=>{p.classList.toggle('lit',k<=cur);p.classList.toggle('cur',k===cur)});
+    document.getElementById('counter').textContent=(cur+1)+' / '+slides.length;
+    slides[cur].scrollTop=0;
+    try{history.replaceState(null,'','#s'+(cur+1))}catch(e){}
+    updateClock();
+  }
+  document.getElementById('prev').onclick=()=>go(cur-1);
+  document.getElementById('next').onclick=()=>go(cur+1);
+  document.addEventListener('keydown',e=>{
+    const t=e.target;
+    if(t.closest&&t.closest('input,textarea,select'))return;
+    if(['ArrowRight','PageDown',' '].includes(e.key)){if(e.key===' '&&t.closest('button,summary,a'))return;e.preventDefault();go(cur+1)}
+    else if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();go(cur-1)}
+    else if(e.key==='Home')go(0);else if(e.key==='End')go(slides.length-1);
+    else if(e.key==='n'||e.key==='N')toggleNotes();
+    else if(e.key==='f'||e.key==='F')toggleFs();
+  });
+  let tx=null;
+  document.getElementById('slides').addEventListener('touchstart',e=>{tx=e.touches[0].clientX},{passive:true});
+  document.getElementById('slides').addEventListener('touchend',e=>{if(tx===null)return;const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>70&&!e.target.closest('input,.svgwrap,.tablewrap'))go(cur+(d<0?1:-1));tx=null});
+
+  function toggleNotes(){document.body.classList.toggle('show-notes')}
+  document.getElementById('notesBtn').onclick=toggleNotes;
+  function toggleFs(){
+    try{ if(document.fullscreenElement)document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(()=>{}); }catch(e){}
+  }
+  document.getElementById('fsBtn').onclick=toggleFs;
+
+  // lesson clock
+  let lessonStart=null, lessonTick=null;
+  const clockChip=document.getElementById('clockChip'), planChip=document.getElementById('planChip'), clockBtn=document.getElementById('clockBtn');
+  const fmt=s=>{s=Math.max(0,Math.floor(s));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
+  function updateClock(){
+    const plan=slides[cur].dataset.plan;
+    const el=lessonStart?(Date.now()-lessonStart)/1000:0;
+    clockChip.textContent='hodina '+fmt(el)+' / 65:00';
+    clockChip.classList.toggle('late',el>65*60);
+    if(plan){
+      planChip.textContent='plán '+plan+' min';
+      const end=+plan.split('–')[1];
+      planChip.classList.toggle('late',!!lessonStart&&el>end*60);
+    }else{planChip.textContent='plán —';planChip.classList.remove('late')}
+  }
+  clockBtn.onclick=()=>{
+    if(lessonStart){lessonStart=null;clearInterval(lessonTick);clockBtn.textContent='Spustit hodinu'}
+    else{lessonStart=Date.now();lessonTick=setInterval(updateClock,1000);clockBtn.textContent='Vynulovat'}
+    updateClock();
+  };
+
+  // countdown timers
+  document.querySelectorAll('.timer').forEach(tm=>{
+    const total=+tm.dataset.seconds, out=tm.querySelector('.t'), tg=tm.querySelector('[data-act=toggle]');
+    let left=total, iv=null, endAt=0;
+    const render=()=>{const s=Math.ceil(left);out.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+    tg.onclick=()=>{
+      if(iv){clearInterval(iv);iv=null;tg.textContent='Pokračovat';return}
+      if(left<=0)left=total;
+      tm.classList.remove('done');endAt=Date.now()+left*1000;tg.textContent='Pauza';
+      iv=setInterval(()=>{left=Math.max(0,(endAt-Date.now())/1000);render();if(left<=0){clearInterval(iv);iv=null;tm.classList.add('done');tg.textContent='Start'}},250);
+    };
+    tm.querySelector('[data-act=reset]').onclick=()=>{clearInterval(iv);iv=null;left=total;tm.classList.remove('done');tg.textContent='Start';render()};
+    render();
+  });
+
+  // tally
+  const qs=['Spravoval(a) už nějakou síť, doma nebo ve škole','Umí vysvětlit, k čemu slouží maska podsítě','Někdy použil(a) Wireshark','Pracuje v příkazové řádce Linuxu','Už učí, nebo se ve škole stará o techniku'];
+  const counts=qs.map(()=>0);
+  const tally=document.getElementById('tally'), present=document.getElementById('present');
+  qs.forEach((q,i)=>{
+    const r=document.createElement('div');r.className='trow';
+    r.innerHTML='<span>'+q+'</span><span class="ctr"><button type="button" aria-label="Ubrat">−</button><output aria-live="polite">0</output><button type="button" aria-label="Přidat">+</button></span><span class="bar"><i></i></span>';
+    const [m,p]=r.querySelectorAll('button');
+    m.onclick=()=>{counts[i]=Math.max(0,counts[i]-1);draw()};
+    p.onclick=()=>{counts[i]++;draw()};
+    tally.appendChild(r);
+  });
+  function draw(){
+    const n=Math.max(1,+present.value||1);
+    [...tally.children].forEach((r,i)=>{r.querySelector('output').textContent=counts[i];r.querySelector('.bar i').style.width=Math.min(100,counts[i]/n*100)+'%'});
+  }
+  present.addEventListener('input',draw);
+
+  // commands
+  const cmds=[
+    ['Moje IPv4 adresa a maska','ipconfig /all','ip -4 a','ifconfig <rozhraní>'],
+    ['MAC adresa','getmac /v','ip link','ifconfig <rozhraní> | grep ether'],
+    ['Výchozí brána','ipconfig','ip -4 r','route -n get default'],
+    ['DNS server','ipconfig /all','resolvectl status','scutil --dns | grep nameserver'],
+    ['Dosáhnu na bránu?','ping <brána>','ping -c 4 <brána>','ping -c 4 <brána>'],
+    ['Odpoví veřejná IP na ping?','ping 1.1.1.1','ping -c 4 1.1.1.1','ping -c 4 1.1.1.1'],
+    ['Přeloží se jméno?','nslookup pedf.cuni.cz','dig pedf.cuni.cz','dig pedf.cuni.cz'],
+    ['Kudy vede IPv4 cesta?','tracert -4 pedf.cuni.cz','traceroute -4 pedf.cuni.cz','traceroute pedf.cuni.cz'],
+    ['Kdo je v mé ARP tabulce?','arp -a','ip -4 neigh','arp -a']
+  ];
+  const osIdx={win:1,lin:2,mac:3};
+  const cmdHelp={
+    win:'<code>&lt;brána&gt;</code> nahraďte skutečnou IP adresou brány. Ve výpisu vyberte aktivní adaptér a IPv4 údaje. Ping jednoho cíle ověřuje jen jeho odpověď ICMP.',
+    lin:'Maska z <code>ip -4 a</code> je prefix, například <code>/24</code>. <code>&lt;brána&gt;</code> nahraďte IP brány. Chybí-li <code>resolvectl</code>, zkuste <code>nmcli dev show</code>. Adresa <code>127.0.0.53</code> je lokální resolver. Některé nástroje nemusí být nainstalované.',
+    mac:'<code>networksetup -listallhardwareports</code> vypíše rozhraní. <code>&lt;rozhraní&gt;</code> nahraďte aktivním rozhraním (např. <code>en0</code>), <code>&lt;brána&gt;</code> IP brány. Maska <code>0xffffff00</code> z <code>ifconfig</code> funguje i v naší mapě.'
+  };
+  const body=document.getElementById('cmdBody');
+  const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  function renderCmds(os){
+    document.getElementById('cmdHelp').innerHTML=cmdHelp[os];
+    body.innerHTML=cmds.map(c=>'<tr><td>'+c[0]+'</td><td><span class="cmd"><code>'+esc(c[osIdx[os]])+'</code><button class="copy" type="button">kopírovat</button></span></td></tr>').join('');
+    body.querySelectorAll('.copy').forEach(b=>b.onclick=()=>{
+      const code=b.previousElementSibling, txt=code.textContent;
+      const ok=()=>{b.textContent='zkopírováno';setTimeout(()=>b.textContent='kopírovat',1400)};
+      const fallback=()=>{const r=document.createRange();r.selectNodeContents(code);const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent='vybráno, Ctrl+C'};
+      try{navigator.clipboard.writeText(txt).then(ok,fallback)}catch(e){fallback()}
+    });
+  }
+  document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected',x===t?'true':'false'));
+    renderCmds(t.dataset.os);
+  });
+  renderCmds('win');
+
+  // network map
+  const $=id=>document.getElementById(id);
+  function ip2n(s){const p=String(s).trim().split('.');if(p.length!==4)return null;let n=0;for(const x of p){if(!/^\d{1,3}$/.test(x)||+x>255)return null;n=n*256+(+x)}return n>>>0}
+  const n2ip=n=>[n>>>24,(n>>>16)&255,(n>>>8)&255,n&255].join('.');
+  function maskBits(s){
+    s=String(s).trim().replace(/^\//,'');
+    if(/^\d{1,2}$/.test(s)&&+s<=32)return +s;
+    const n=/^0x[0-9a-f]{8}$/i.test(s)?Number.parseInt(s.slice(2),16)>>>0:ip2n(s);if(n===null)return null;
+    let b=0,seen0=false;for(let i=31;i>=0;i--){if((n>>>i)&1){if(seen0)return null;b++}else seen0=true}return b;
+  }
+  // A special range is not necessarily unreachable. The label describes its purpose.
+  const specialIPv4=[
+    ['255.255.255.255',32,'omezený broadcast'],
+    ['0.0.0.0',32,'neurčená adresa'],
+    ['0.0.0.0',8,'tato síť (zvláštní rozsah)'],
+    ['10.0.0.0',8,'privátní (RFC 1918)'],
+    ['100.64.0.0',10,'sdílený prostor CGNAT'],
+    ['127.0.0.0',8,'loopback (tento počítač)'],
+    ['169.254.0.0',16,'link-local (často APIPA)'],
+    ['172.16.0.0',12,'privátní (RFC 1918)'],
+    ['192.0.0.0',24,'zvláštní účel (IANA)'],
+    ['192.0.2.0',24,'dokumentační (TEST-NET-1)'],
+    ['192.31.196.0',24,'zvláštní účel (AS112)'],
+    ['192.52.193.0',24,'zvláštní účel (AMT)'],
+    ['192.88.99.0',24,'zvláštní účel (6to4 / 6a44)'],
+    ['192.168.0.0',16,'privátní (RFC 1918)'],
+    ['192.175.48.0',24,'zvláštní účel (AS112)'],
+    ['198.18.0.0',15,'testovací rozsah (benchmark)'],
+    ['198.51.100.0',24,'dokumentační (TEST-NET-2)'],
+    ['203.0.113.0',24,'dokumentační (TEST-NET-3)'],
+    ['224.0.0.0',4,'multicast'],
+    ['240.0.0.0',4,'vyhrazená adresa']
+  ].map(([base,bits,label])=>({base:ip2n(base),bits,label}));
+  function privKind(n){
+    if(n===null)return '';
+    const special=specialIPv4.find(r=>(n>>>(32-r.bits))===(r.base>>>(32-r.bits)));
+    return special?special.label:'veřejný adresní prostor';
+  }
+  const isLoopback=n=>n!==null&&(n>>>24)===127;
+  const isLinkLocal=n=>n!==null&&(n>>>16)===(169*256+254);
+  const isBadLanAddress=n=>n!==null&&((n>>>24)===0||isLoopback(n)||n>=0xe0000000);
+  const svgNS='http://www.w3.org/2000/svg';
+  function el(tag,attrs,text){const e=document.createElementNS(svgNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(text!=null)e.textContent=text;return e}
+  function node(svg,x,y,w,h,title,lines,color){
+    const g=el('g',{});
+    g.appendChild(el('rect',{x,y,width:w,height:h,rx:10,fill:'var(--surface)',stroke:color,'stroke-width':2.5}));
+    g.appendChild(el('text',{x:x+14,y:y+26,fill:color,'font-family':'Chivo, Arial, sans-serif','font-weight':700,'font-size':17},title));
+    lines.forEach((l,i)=>{
+      const max=Math.floor((w-28)/8.2), full=String(l);
+      const label=el('text',{x:x+14,y:y+50+i*20,fill:'var(--fg)','font-family':'JetBrains Mono, monospace','font-size':13.5},full.length>max?full.slice(0,max-1)+'…':full);
+      label.appendChild(el('title',{},full));g.appendChild(label);
+    });
+    svg.appendChild(g);
+  }
+  function link(svg,x1,y1,x2,y2,color,label,dash){
+    svg.appendChild(el('line',{x1,y1,x2,y2,stroke:color,'stroke-width':3,'stroke-dasharray':dash||''}));
+    if(label)svg.appendChild(el('text',{x:(x1+x2)/2,y:(y1+y2)/2-8,fill:'var(--muted)','text-anchor':'middle','font-family':'JetBrains Mono, monospace','font-size':12},label));
+  }
+  function drawNet(){
+    const ip=ip2n($('fIp').value), bits=maskBits($('fMask').value), gw=ip2n($('fGw').value), dns=ip2n($('fDns').value);
+    const svg=$('netSvg');svg.innerHTML='';
+    const f=[];
+    const add=(t,c)=>f.push('<span class="fact '+(c||'')+'">'+esc(t)+'</span>');
+    if(ip===null)add('IP adresa nemá platný IPv4 tvar','bad');
+    else add('adresa: '+privKind(ip),isBadLanAddress(ip)?'bad':isLinkLocal(ip)?'warn':'');
+    if(bits===null)add('maska nemá platný tvar','bad');else add('prefix /'+bits);
+    if(gw===null)add('brána nemá platný IPv4 tvar','bad');
+    if(dns===null)add('DNS nemá platný IPv4 tvar','bad');
+    let net='?',gwIn=null,dnsIn=null;
+    if(ip!==null&&bits!==null){
+      const m=bits===0?0:(0xFFFFFFFF<<(32-bits))>>>0;
+      const nn=(ip&m)>>>0, broadcast=(nn|(~m>>>0))>>>0;net=n2ip(nn)+'/'+bits;
+      add('prefix sítě '+net);
+      if(bits<31){
+        add('broadcast '+n2ip(broadcast));add('hostových pozic: '+(Math.pow(2,32-bits)-2));
+        if(ip===nn)add('moje IP je adresa sítě, ne hosta','bad');
+        if(ip===broadcast)add('moje IP je broadcast, ne host','bad');
+        if(gw===nn||gw===broadcast)add('brána je adresa sítě nebo broadcast','bad');
+      }else if(bits===31){add('2 adresy pro spoj bod–bod (RFC 3021)');add('bez směrovaného broadcastu');}
+      else{add('/32 označuje jedinou adresu');add('bez směrovaného broadcastu');}
+      if(gw!==null)gwIn=((gw&m)>>>0)===nn;
+      if(dns!==null)dnsIn=((dns&m)>>>0)===nn;
+    }
+    if(gw!==null&&gw===ip)add('brána nesmí být moje vlastní IP','bad');
+    if(isBadLanAddress(gw))add('tato adresa se nehodí jako běžná LAN brána','bad');
+    if(isLinkLocal(ip))add('link-local se nesměruje, ověřte konfiguraci DHCP','warn');
+    if(gwIn===true)add('brána je podle masky v mé podsíti','good');
+    else if(gwIn===false)add('brána je mimo podsíť, ověřte trasy','warn');
+    const dnsLocal=isLoopback(dns)||(dns!==null&&dns===ip);
+    if(dnsLocal)add('DNS resolver běží v mém počítači');
+    else if(dnsIn===true)add('DNS je podle masky v místní podsíti');
+    else if(dnsIn===false)add('DNS je mimo místní podsíť');
+    $('facts').innerHTML=f.join('');
+    if(ip===null||bits===null){
+      svg.appendChild(el('text',{x:480,y:150,fill:'var(--muted)','text-anchor':'middle','font-size':20},'Zadejte platnou IPv4 adresu a masku.'));return;
+    }
+    // LAN box
+    svg.appendChild(el('rect',{x:16,y:16,width:470,height:268,rx:14,fill:'var(--blue-soft)',stroke:'var(--blue)','stroke-dasharray':'6 6'}));
+    svg.appendChild(el('text',{x:32,y:42,fill:'var(--blue)','font-family':'JetBrains Mono, monospace','font-size':13,'font-weight':600},'místní prefix '+net));
+    node(svg,40,70,200,96,'Můj počítač',[$('fIp').value,$('fMac').value],'var(--orange)');
+    node(svg,290,70,180,76,'Brána',[$('fGw').value],'var(--green)');
+    link(svg,240,110,290,108,'var(--fg)','');
+    const dnsX=dnsLocal||dnsIn?40:530, dnsY=190;
+    node(svg,dnsX,dnsY,200,76,dnsLocal?'Lokální resolver':'DNS resolver',[$('fDns').value],'var(--brown)');
+    if(dnsLocal||dnsIn)link(svg,140,166,140,190,'var(--brown)','',"4 4");
+    else link(svg,380,146,dnsX,dnsY+38,'var(--brown)','',"4 4");
+    // beyond
+    node(svg,530,70,190,76,'Hopy za bránou',[$('fEdge').value.split('→')[0].trim()||'podle trasy'],'var(--blue)');
+    link(svg,470,108,530,108,'var(--fg)','');
+    node(svg,770,70,170,76,'Další sítě',[$('fEdge').value.includes('→')?$('fEdge').value.split('→')[1].trim():'podle trasy'],'var(--muted)');
+    link(svg,720,108,770,108,'var(--fg)','');
+    node(svg,770,190,170,76,'Cílový web',['pedf.cuni.cz'],'var(--muted)');
+    link(svg,855,146,855,190,'var(--muted)','','4 4');
+  }
+  $('netForm').addEventListener('input',drawNet);
+  $('netForm').addEventListener('submit',e=>e.preventDefault());
+  drawNet();
+
+  // diagnosis
+  const tests=[['gw','ping <brána>','Odpoví brána na ping?'],['net','ping 1.1.1.1','Odpoví 1.1.1.1 na ping?'],['dns','nslookup pedf.cuni.cz','Přeloží se jméno na IP?']];
+  const state={gw:true,net:true,dns:true};
+  const checks=$('checks');
+  tests.forEach(([k,c,l])=>{
+    const r=document.createElement('div');r.className='sw';
+    r.innerHTML='<span><b>'+l+'</b><br><code>'+esc(c)+'</code></span><span class="seg2" role="group" aria-label="'+l+'"><button type="button" class="y">✓</button><button type="button" class="n">✗</button></span>';
+    const [y,n]=r.querySelectorAll('button');
+    y.setAttribute('aria-label','Test prošel');n.setAttribute('aria-label','Test selhal');
+    y.onclick=()=>{state[k]=true;diag()};n.onclick=()=>{state[k]=false;diag()};
+    r.dataset.k=k;checks.appendChild(r);
+  });
+  function diag(){
+    [...checks.children].forEach(r=>{const v=state[r.dataset.k];const [y,n]=r.querySelectorAll('button');y.setAttribute('aria-pressed',v?'true':'false');n.setAttribute('aria-pressed',v?'false':'true')});
+    let where,what,next;
+    if(state.net&&!state.dns){where='podezření na DNS';what='Veřejná IP odpovídá, překlad jména selhal.';next='Zkus nslookup pedf.cuni.cz 1.1.1.1, pokud síť dovoluje externí DNS. Rozdíl pomůže ověřit nastavený resolver a jeho odpověď.'}
+    else if(state.net&&state.dns){where='web nebo aplikace';what='Testy IP konektivity a DNS prošly.';next='Zkus jiný web a prohlížeč. Prověř cílový server, proxy a certifikát TLS.'}
+    else if(state.dns){where='ping nebo cesta k testovanému cíli';what='DNS odpovídá, ping na 1.1.1.1 neprošel.';next='Zkus otevřít web. Ping může blokovat filtr, DNS může být místní nebo odpovídat z cache.'}
+    else if(state.gw){where='cesta za bránou';what='Brána odpovídá, další dva testy selhaly.';next='Prověř směrování, firewall a konektivitu školy. Traceroute napoví, ale poslední odpověď sama neurčuje místo poruchy.'}
+    else{where='nejdřív místní síť';what='Žádný ze tří testů neprošel.';next='Zkontroluj kabel nebo Wi‑Fi, IP, masku a bránu. 169.254.x.x často ukazuje na nezískanou konfiguraci DHCP. Testy může blokovat také firewall.'}
+    if(state.net&&!state.gw)next='Brána může jen blokovat ping, provoz k 1.1.1.1 totiž prochází. '+next;
+    $('verdict').innerHTML='<span class="where">ověřovat: '+where+'</span><h3>'+what+'</h3><p>'+next+'</p>';
+  }
+  diag();
+
+  // ordering
+  const correct=[
+    ['DHCP při připojení','počítač dostane IP, masku, bránu a DNS ještě před Enterem'],
+    ['ARP','zjistí MAC brány, pokud ji nemá v cache a DNS je mimo podsíť'],
+    ['DNS','přeloží pedf.cuni.cz na IP adresu'],
+    ['Cesta přes routery','pakety k webu putují podle tras, stejně jako už předtím DNS dotaz'],
+    ['TCP handshake','SYN, SYN-ACK, ACK'],
+    ['TLS handshake','dohodnou se na šifrování, prohlížeč ověří certifikát serveru'],
+    ['HTTP požadavek','server vrátí HTML, prohlížeč načítá další zdroje a vykresluje stránku']
+  ];
+  let order=[];
+  const ol=$('order');
+  function shuffle(){order=correct.map((_,i)=>i);for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]]}if(order.every((v,i)=>v===i))order.reverse();renderOrder();$('orderFb').textContent=''}
+  function renderOrder(marks){
+    ol.innerHTML='';
+    order.forEach((ix,pos)=>{
+      const li=document.createElement('li');
+      if(marks)li.className=ix===pos?'right':'wrong';
+      li.innerHTML='<span class="n">'+(pos+1)+'</span><span><b>'+correct[ix][0]+'</b><small>'+(marks?correct[ix][1]:'&nbsp;')+'</small></span><span class="mv"><button type="button" aria-label="Posunout nahoru">↑</button><button type="button" aria-label="Posunout dolů">↓</button></span>';
+      const [u,d]=li.querySelectorAll('button');
+      u.disabled=pos===0;d.disabled=pos===order.length-1;
+      u.onclick=()=>{[order[pos-1],order[pos]]=[order[pos],order[pos-1]];renderOrder();$('orderFb').textContent=''};
+      d.onclick=()=>{[order[pos+1],order[pos]]=[order[pos],order[pos+1]];renderOrder();$('orderFb').textContent=''};
+      ol.appendChild(li);
+    });
+  }
+  $('checkOrder').onclick=()=>{
+    renderOrder(true);
+    const ok=order.filter((v,i)=>v===i).length;
+    const fb=$('orderFb');
+    const arp=order.indexOf(1), dns=order.indexOf(2);
+    if(ok===order.length){fb.textContent='Správně pro náš příklad. DHCP už proběhlo před Enterem, směrování provází všechny IP pakety.';fb.style.color='var(--ok)'}
+    else if(dns<arp&&ok===order.length-2){fb.textContent='DNS je u nás mimo podsíť: bez ARP cache nejdřív potřebujeme MAC brány. S cache své pořadí obhajte.';fb.style.color='var(--warn)'}
+    else{fb.textContent='Na místě je '+ok+' ze 7. Zelené kroky sedí.';fb.style.color='var(--bad)'}
+  };
+  $('shuffleOrder').onclick=shuffle;
+  shuffle();
+
+  // start
+  function openHash(){
+    const m=/^#s(\d+)$/.exec(location.hash);
+    go(m?(+m[1]-1):0);
+  }
+  window.addEventListener('hashchange',openHash);
+  openHash();
+})();
+</script>
+
+</body></html>
